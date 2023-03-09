@@ -1,10 +1,21 @@
 # Project template for rp2040-hal
 
-This template is intended as a starting point for developing your own firmware based on the rp2040-hal.
+This project is a simple game built for the Raspberry Pi Pico W and similar RP2040 chips using these 808 buttons from Adafruit.
 
-It includes all of the `knurling-rs` tooling as showcased in https://github.com/knurling-rs/app-template (`defmt`, `defmt-rtt`, `panic-probe`, `flip-link`) to make development as easy as possible.
+It couldnt be possible without the help from the creators of [rp2040-hal](https://crates.io/crates/rp2040-hal) crate.
+
+I have organized this repo into "Chapters" in the examples folder, as a way to save my progress and to help me learn.
+
+They started out simple, with my "hello world" (blink an LED) of embedded rust. Each "chapter" represents my advancement in understanding.
+
+If you have any questions at all about this repo please open an issue! I would be flattered and honored that you have found my code!
+
+Rust is new to me too, so we can learn together.
+
+## Rest of rp-hal documentation below
 
 `probe-run` is configured as the default runner, so you can start your program as easy as
+
 ```sh
 cargo run --release
 ```
@@ -64,7 +75,6 @@ cargo install elf2uf2-rs --locked
 
 </details>
 
-
 <!-- Running -->
 <details open="open">
   <summary><h2 style="display: inline-block" id="running">Running</h2></summary>
@@ -80,36 +90,47 @@ cargo run --release
 
 If you do not specify a DEFMT_LOG level, it will be set to `debug`.
 That means `println!("")`, `info!("")` and `debug!("")` statements will be printed.
-If you wish to override this, you can change it in `.cargo/config.toml` 
+If you wish to override this, you can change it in `.cargo/config.toml`
+
 ```toml
 [env]
 DEFMT_LOG = "off"
 ```
-You can also set this inline (on Linux/MacOS)  
+
+You can also set this inline (on Linux/MacOS)
+
 ```sh
 DEFMT_LOG=trace cargo run
 ```
 
 or set the _environment variable_ so that it applies to every `cargo run` call that follows:
+
 #### Linux/MacOS/unix
+
 ```sh
 export DEFMT_LOG=trace
 ```
 
 Setting the DEFMT_LOG level for the current session  
 for bash
+
 ```sh
 export DEFMT_LOG=trace
 ```
 
 #### Windows
+
 Windows users can only override DEFMT_LOG through `config.toml`
 or by setting the environment variable as a separate step before calling `cargo run`
+
 - cmd
+
 ```cmd
 set DEFMT_LOG=trace
 ```
+
 - powershell
+
 ```ps1
 $Env:DEFMT_LOG = trace
 ```
@@ -123,29 +144,30 @@ cargo run
 <details open="open">
   <summary><h2 style="display: inline-block" id="alternative-runners">Alternative runners</h2></summary>
 
-If you don't have a debug probe or if you want to do interactive debugging you can set up an alternative runner for cargo.  
+If you don't have a debug probe or if you want to do interactive debugging you can set up an alternative runner for cargo.
 
 Some of the options for your `runner` are listed below:
 
-* **cargo embed**  
-  *Step 1* - Install [`cargo embed`](https://github.com/probe-rs/probe-rs/blob/master/cargo-embed):
+- **cargo embed**  
+  _Step 1_ - Install [`cargo embed`](https://github.com/probe-rs/probe-rs/blob/master/cargo-embed):
 
   ```console
   $ cargo install cargo-embed
   ```
 
-  *Step 2* - Make sure your .cargo/config contains the following
+  _Step 2_ - Make sure your .cargo/config contains the following
 
   ```toml
   [target.thumbv6m-none-eabi]
   runner = "cargo embed"
   ```
 
-  *Step 3* - Update settings in [Embed.toml](./Embed.toml)  
-  - The defaults are to flash, reset, and start a defmt logging session
-  You can find all the settings and their meanings [in the cargo-embed repo](https://github.com/probe-rs/probe-rs/blob/master/cargo-embed/src/config/default.toml)
+  _Step 3_ - Update settings in [Embed.toml](./Embed.toml)
 
-  *Step 4* - Use `cargo run`, which will compile the code and start the
+  - The defaults are to flash, reset, and start a defmt logging session
+    You can find all the settings and their meanings [in the cargo-embed repo](https://github.com/probe-rs/probe-rs/blob/master/cargo-embed/src/config/default.toml)
+
+  _Step 4_ - Use `cargo run`, which will compile the code and start the
   specified 'runner'. As the 'runner' is cargo embed, it will flash the device
   and start running immediately
 
@@ -153,32 +175,34 @@ Some of the options for your `runner` are listed below:
   $ cargo run --release
   ```
 
-* **probe-rs-debugger**
+- **probe-rs-debugger**
 
-  *Step 1* - Download [`probe-rs-debugger VSCode plugin 0.4.0`](https://github.com/probe-rs/vscode/releases/download/v0.4.0/probe-rs-debugger-0.4.0.vsix)
+  _Step 1_ - Download [`probe-rs-debugger VSCode plugin 0.4.0`](https://github.com/probe-rs/vscode/releases/download/v0.4.0/probe-rs-debugger-0.4.0.vsix)
 
-  *Step 2* - Install `probe-rs-debugger VSCode plugin`
+  _Step 2_ - Install `probe-rs-debugger VSCode plugin`
+
   ```console
   $ code --install-extension probe-rs-debugger-0.4.0.vsix
   ```
 
-  *Step 3* - Install `probe-rs-debugger`
+  _Step 3_ - Install `probe-rs-debugger`
+
   ```console
   $ cargo install probe-rs-debugger
   ```
 
-  *Step 4* - Open this project in VSCode
+  _Step 4_ - Open this project in VSCode
 
-  *Step 5* - Launch a debug session by choosing `Run`>`Start Debugging` (or press F5)
+  _Step 5_ - Launch a debug session by choosing `Run`>`Start Debugging` (or press F5)
 
-* **Loading a UF2 over USB**  
-  *Step 1* - Install [`elf2uf2-rs`](https://github.com/JoNil/elf2uf2-rs):
+- **Loading a UF2 over USB**  
+  _Step 1_ - Install [`elf2uf2-rs`](https://github.com/JoNil/elf2uf2-rs):
 
   ```console
   $ cargo install elf2uf2-rs --locked
   ```
 
-  *Step 2* - Make sure your .cargo/config contains the following
+  _Step 2_ - Make sure your .cargo/config contains the following
 
   ```toml
   [target.thumbv6m-none-eabi]
@@ -188,11 +212,11 @@ Some of the options for your `runner` are listed below:
   The `thumbv6m-none-eabi` target may be replaced by the all-Arm wildcard
   `'cfg(all(target_arch = "arm", target_os = "none"))'`.
 
-  *Step 3* - Boot your RP2040 into "USB Bootloader mode", typically by rebooting
+  _Step 3_ - Boot your RP2040 into "USB Bootloader mode", typically by rebooting
   whilst holding some kind of "Boot Select" button. On Linux, you will also need
   to 'mount' the device, like you would a USB Thumb Drive.
 
-  *Step 4* - Use `cargo run`, which will compile the code and start the
+  _Step 4_ - Use `cargo run`, which will compile the code and start the
   specified 'runner'. As the 'runner' is the elf2uf2-rs tool, it will build a UF2
   file and copy it to your RP2040.
 
@@ -200,7 +224,7 @@ Some of the options for your `runner` are listed below:
   $ cargo run --release
   ```
 
-* **Loading with picotool**  
+- **Loading with picotool**  
   As ELF files produced by compiling Rust code are completely compatible with ELF
   files produced by compiling C or C++ code, you can also use the Raspberry Pi
   tool [picotool](https://github.com/raspberrypi/picotool). The only thing to be
@@ -245,10 +269,10 @@ The steps are:
 ## Code of Conduct
 
 Contribution to this crate is organized under the terms of the [Rust Code of
-Conduct][CoC], and the maintainer of this crate, the [rp-rs team], promises
+Conduct][coc], and the maintainer of this crate, the [rp-rs team], promises
 to intervene to uphold that code of conduct.
 
-[CoC]: CODE_OF_CONDUCT.md
+[coc]: CODE_OF_CONDUCT.md
 [rp-rs team]: https://github.com/orgs/rp-rs/teams/rp-rs
 
 ## License
