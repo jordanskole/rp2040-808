@@ -1,73 +1,186 @@
-//! Blinks the LED on a Pico board
-//!
-//! This will blink an LED attached to GP25, which is the pin the Pico uses for the on-board LED.
 #![no_std]
 #![no_main]
 
-use bsp::entry;
-use defmt::*;
-use defmt_rtt as _;
-use embedded_hal::digital::v2::OutputPin;
-use panic_probe as _;
+use panic_halt as _;
 
-// Provide an alias for our BSP so we can switch targets quickly.
-// Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
-use rp_pico as bsp;
-// use sparkfun_pro_micro_rp2040 as bsp;
+#[rtic::app(device = rp_pico::hal::pac, peripherals = true)]
+mod app {
+    // use fugit::MicrosDurationU32;
 
-use bsp::hal::{
-    clocks::{init_clocks_and_plls, Clock},
-    pac,
-    sio::Sio,
-    watchdog::Watchdog,
-};
+    use rp_pico::{
+        hal::{
+            self,
+            clocks::init_clocks_and_plls,
+            gpio::Interrupt::LevelLow,
+            gpio::{PullUp, PushPull},
+            watchdog::Watchdog,
+            Clock, Sio,
+        },
+        XOSC_CRYSTAL_FREQ,
+    };
 
-#[entry]
-fn main() -> ! {
-    info!("Program start");
-    let mut pac = pac::Peripherals::take().unwrap();
-    let core = pac::CorePeripherals::take().unwrap();
-    let mut watchdog = Watchdog::new(pac.WATCHDOG);
-    let sio = Sio::new(pac.SIO);
+    // #[monotonic(binds = TIMER_IRQ_0, default = true)]
+    // type Rp2040Mono = Rp2040Monotonic;
 
-    // External high-speed crystal on the pico board is 12Mhz
-    let external_xtal_freq_hz = 12_000_000u32;
-    let clocks = init_clocks_and_plls(
-        external_xtal_freq_hz,
-        pac.XOSC,
-        pac.CLOCKS,
-        pac.PLL_SYS,
-        pac.PLL_USB,
-        &mut pac.RESETS,
-        &mut watchdog,
-    )
-    .ok()
-    .unwrap();
+    #[shared]
+    struct Shared {
+        left_led: hal::gpio::Pin<hal::gpio::pin::bank0::Gpio0, hal::gpio::Output<PushPull>>,
+        center_led: hal::gpio::Pin<hal::gpio::pin::bank0::Gpio1, hal::gpio::Output<PushPull>>,
+        right_led: hal::gpio::Pin<hal::gpio::pin::bank0::Gpio2, hal::gpio::Output<PushPull>>,
+    }
 
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    #[local]
+    struct Local {
+        left_button: hal::gpio::Pin<hal::gpio::pin::bank0::Gpio16, hal::gpio::Input<PullUp>>,
+        center_button: hal::gpio::Pin<hal::gpio::pin::bank0::Gpio17, hal::gpio::Input<PullUp>>,
+        right_button: hal::gpio::Pin<hal::gpio::pin::bank0::Gpio21, hal::gpio::Input<PullUp>>,
+        delay: cortex_m::delay::Delay,
+    }
 
-    let pins = bsp::Pins::new(
-        pac.IO_BANK0,
-        pac.PADS_BANK0,
-        sio.gpio_bank0,
-        &mut pac.RESETS,
-    );
+    #[init]
+    fn init(c: init::Context) -> (Shared, Local, init::Monotonics) {
+        // Soft-reset does not release the hardware spinlocks
+        // Release them now to avoid a deadlock after debug or watchdog reset
+        unsafe {
+            hal::sio::spinlock_reset();
+        }
+        // notice how in this chapter we use "c"
+        // for example c.deviceresets
+        let mut resets = c.device.RESETS;
+        let mut watchdog = Watchdog::new(c.device.WATCHDOG);
+        let _clocks = init_clocks_and_plls(
+            XOSC_CRYSTAL_FREQ,
+            c.device.XOSC,
+            c.device.CLOCKS,
+            c.device.PLL_SYS,
+            c.device.PLL_USB,
+            &mut resets,
+            &mut watchdog,
+        )
+        .ok()
+        .unwrap();
 
-    // This is the correct pin on the Raspberry Pico board. On other boards, even if they have an
-    // on-board LED, it might need to be changed.
-    // Notably, on the Pico W, the LED is not connected to any of the RP2040 GPIOs but to the cyw43 module instead. If you have
-    // a Pico W and want to toggle a LED with a simple GPIO output pin, you can connect an external
-    // LED to one of the GPIO pins, and reference that pin here.
-    let mut led_pin = pins.led.into_push_pull_output();
+        let sio = Sio::new(c.device.SIO);
+        let pins = rp_pico::Pins::new(
+            c.device.IO_BANK0,
+            c.device.PADS_BANK0,
+            sio.gpio_bank0,
+            &mut resets,
+        );
 
-    loop {
-        info!("on!");
-        led_pin.set_high().unwrap();
-        delay.delay_ms(500);
-        info!("off!");
-        led_pin.set_low().unwrap();
-        delay.delay_ms(500);
+        let delay = cortex_m::delay::Delay::new(c.core.SYST, _clocks.system_clock.freq().to_Hz());
+        let left_led = pins.gpio0.into_push_pull_output();
+        let center_led = pins.gpio1.into_push_pull_output();
+        let right_led = pins.gpio2.into_push_pull_output();
+
+        // Our button inputs
+        let left_button = pins.gpio16.into_pull_up_input();
+        left_button.set_interrupt_enabled(LevelLow, true);
+
+        let center_button = pins.gpio17.into_pull_up_input();
+        center_button.set_interrupt_enabled(LevelLow, true);
+
+        let right_button = pins.gpio21.into_pull_up_input();
+        right_button.set_interrupt_enabled(LevelLow, true);
+
+        (
+            Shared {
+                left_led,
+                center_led,
+                right_led,
+            },
+            Local {
+                left_button,
+                center_button,
+                right_button,
+                delay,
+            },
+            init::Monotonics(),
+        )
+    }
+
+    #[idle(
+      shared = [left_led, center_led, right_led],
+      local = [delay]
+    )]
+    fn idle(mut ctx: idle::Context) -> ! {
+        use embedded_hal::digital::v2::OutputPin;
+
+        loop {
+            ctx.shared.left_led.lock(|left_led| {
+                left_led.set_high().unwrap();
+            });
+            ctx.local.delay.delay_ms(250);
+
+            ctx.shared.center_led.lock(|center_led| {
+                center_led.set_high().unwrap();
+            });
+            ctx.shared.left_led.lock(|left_led| {
+                left_led.set_low().unwrap();
+            });
+            ctx.local.delay.delay_ms(250);
+
+            ctx.shared.right_led.lock(|right_led| {
+                right_led.set_high().unwrap();
+            });
+            ctx.shared.center_led.lock(|center_led| {
+                center_led.set_low().unwrap();
+            });
+            ctx.local.delay.delay_ms(250);
+
+            ctx.shared.right_led.lock(|right_led| {
+                right_led.set_low().unwrap();
+            })
+        }
+    }
+
+    #[task(binds = IO_IRQ_BANK0, local = [left_button, center_button, right_button], shared = [left_led, center_led, right_led])]
+    fn button_press(mut ctx: button_press::Context) {
+        use embedded_hal::digital::v2::{InputPin, OutputPin};
+        loop {
+            if ctx.local.left_button.is_high().unwrap()
+                && ctx.local.center_button.is_high().unwrap()
+                && ctx.local.right_button.is_high().unwrap()
+            {
+                (
+                    ctx.shared.left_led,
+                    ctx.shared.center_led,
+                    ctx.shared.right_led,
+                )
+                    .lock(|left_led, center_led, right_led| {
+                        left_led.set_low().unwrap();
+                        center_led.set_low().unwrap();
+                        right_led.set_low().unwrap();
+                    });
+                break;
+            }
+            if ctx.local.left_button.is_low().unwrap() {
+                ctx.shared.left_led.lock(|left_led| {
+                    left_led.set_high().unwrap();
+                })
+            } else {
+                ctx.shared.left_led.lock(|left_led| {
+                    left_led.set_low().unwrap();
+                })
+            }
+            if ctx.local.center_button.is_low().unwrap() {
+                ctx.shared.center_led.lock(|center_led| {
+                    center_led.set_high().unwrap();
+                })
+            } else {
+                ctx.shared.center_led.lock(|center_led| {
+                    center_led.set_low().unwrap();
+                })
+            }
+            if ctx.local.right_button.is_low().unwrap() {
+                ctx.shared.right_led.lock(|right_led| {
+                    right_led.set_high().unwrap();
+                })
+            } else {
+                ctx.shared.right_led.lock(|right_led| {
+                    right_led.set_low().unwrap();
+                })
+            }
+        }
     }
 }
-
-// End of file
