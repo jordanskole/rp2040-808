@@ -7,7 +7,7 @@ use panic_halt as _;
 // MAKE A PLAN! What all needs to be done?
 // In:
 //   ✅ Random Flash the LEDs
-//   - Add a variable for the length of time the light is on
+//   ✅ Add a variable for the length of time the light is on
 // Out:
 //   - Track button clicks
 //   - Any sort of levels
